@@ -1,5 +1,5 @@
 import { install } from 'riot';
-import { remove, add } from 'data-scroll-animation';
+import { add, remove } from 'data-scroll-animation';
 
 install(component => {
     if (!component.hasDataScrollAnimation) {
@@ -9,6 +9,7 @@ install(component => {
     const onMounted = component.onMounted;
     component.onMounted = (props, state) => {
         onMounted && onMounted.call(component, props, state);
+        add(component.root);
     };
     const onUnmounted = component.onUnmounted;
     component.onUnmounted = (props, state) => {
