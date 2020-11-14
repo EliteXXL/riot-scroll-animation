@@ -1,6 +1,6 @@
 {
   "name": "riot-scroll-animation",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "RIOT plugin for data-scroll-animation",
   "main": "dist/cjs/index.js",
   "scripts": {

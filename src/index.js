@@ -9,6 +9,7 @@ install(component => {
     const onMounted = component.onMounted;
     component.onMounted = (props, state) => {
         onMounted && onMounted.call(component, props, state);
+        ScrollAnimation.add(component.root);
     };
     const onUnmounted = component.onUnmounted;
     component.onUnmounted = (props, state) => {
