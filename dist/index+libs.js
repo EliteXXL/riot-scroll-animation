@@ -1,6 +1,9 @@
-define(function () { 'use strict';
+(function (factory) {
+  typeof define === 'function' && define.amd ? define(factory) :
+  factory();
+}((function () { 'use strict';
 
-  /* Riot v5.0.0, @license MIT */
+  /* Riot v5.2.0, @license MIT */
   /**
    * Convert a string containing dashes to camel case
    * @param   {string} string - input string
@@ -66,6 +69,58 @@ define(function () { 'use strict';
 
   const replaceChild = (newNode, replaced) => replaced && replaced.parentNode && replaced.parentNode.replaceChild(newNode, replaced);
 
+  // Riot.js constants that can be used accross more modules
+  const COMPONENTS_IMPLEMENTATION_MAP = new Map(),
+        DOM_COMPONENT_INSTANCE_PROPERTY = Symbol('riot-component'),
+        PLUGINS_SET = new Set(),
+        IS_DIRECTIVE = 'is',
+        VALUE_ATTRIBUTE = 'value',
+        MOUNT_METHOD_KEY = 'mount',
+        UPDATE_METHOD_KEY = 'update',
+        UNMOUNT_METHOD_KEY = 'unmount',
+        SHOULD_UPDATE_KEY = 'shouldUpdate',
+        ON_BEFORE_MOUNT_KEY = 'onBeforeMount',
+        ON_MOUNTED_KEY = 'onMounted',
+        ON_BEFORE_UPDATE_KEY = 'onBeforeUpdate',
+        ON_UPDATED_KEY = 'onUpdated',
+        ON_BEFORE_UNMOUNT_KEY = 'onBeforeUnmount',
+        ON_UNMOUNTED_KEY = 'onUnmounted',
+        PROPS_KEY = 'props',
+        STATE_KEY = 'state',
+        SLOTS_KEY = 'slots',
+        ROOT_KEY = 'root',
+        IS_PURE_SYMBOL = Symbol.for('pure'),
+        PARENT_KEY_SYMBOL = Symbol('parent'),
+        ATTRIBUTES_KEY_SYMBOL = Symbol('attributes'),
+        TEMPLATE_KEY_SYMBOL = Symbol('template');
+
+  var globals = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    COMPONENTS_IMPLEMENTATION_MAP: COMPONENTS_IMPLEMENTATION_MAP,
+    DOM_COMPONENT_INSTANCE_PROPERTY: DOM_COMPONENT_INSTANCE_PROPERTY,
+    PLUGINS_SET: PLUGINS_SET,
+    IS_DIRECTIVE: IS_DIRECTIVE,
+    VALUE_ATTRIBUTE: VALUE_ATTRIBUTE,
+    MOUNT_METHOD_KEY: MOUNT_METHOD_KEY,
+    UPDATE_METHOD_KEY: UPDATE_METHOD_KEY,
+    UNMOUNT_METHOD_KEY: UNMOUNT_METHOD_KEY,
+    SHOULD_UPDATE_KEY: SHOULD_UPDATE_KEY,
+    ON_BEFORE_MOUNT_KEY: ON_BEFORE_MOUNT_KEY,
+    ON_MOUNTED_KEY: ON_MOUNTED_KEY,
+    ON_BEFORE_UPDATE_KEY: ON_BEFORE_UPDATE_KEY,
+    ON_UPDATED_KEY: ON_UPDATED_KEY,
+    ON_BEFORE_UNMOUNT_KEY: ON_BEFORE_UNMOUNT_KEY,
+    ON_UNMOUNTED_KEY: ON_UNMOUNTED_KEY,
+    PROPS_KEY: PROPS_KEY,
+    STATE_KEY: STATE_KEY,
+    SLOTS_KEY: SLOTS_KEY,
+    ROOT_KEY: ROOT_KEY,
+    IS_PURE_SYMBOL: IS_PURE_SYMBOL,
+    PARENT_KEY_SYMBOL: PARENT_KEY_SYMBOL,
+    ATTRIBUTES_KEY_SYMBOL: ATTRIBUTES_KEY_SYMBOL,
+    TEMPLATE_KEY_SYMBOL: TEMPLATE_KEY_SYMBOL
+  });
+
   const EACH = 0;
   const IF = 1;
   const SIMPLE = 2;
@@ -77,18 +132,84 @@ define(function () { 'use strict';
   const TEXT = 2;
   const VALUE = 3;
 
+  const HEAD_SYMBOL = Symbol('head');
+  const TAIL_SYMBOL = Symbol('tail');
+
+  /**
+   * Create the <template> fragments comment nodes
+   * @return {Object} {{head: Comment, tail: Comment}}
+   */
+
+  function createHeadTailPlaceholders() {
+    const head = document.createComment('fragment head');
+    const tail = document.createComment('fragment tail');
+    head[HEAD_SYMBOL] = true;
+    tail[TAIL_SYMBOL] = true;
+    return {
+      head,
+      tail
+    };
+  }
+
   /**
    * Create the template meta object in case of <template> fragments
    * @param   {TemplateChunk} componentTemplate - template chunk object
    * @returns {Object} the meta property that will be passed to the mount function of the TemplateChunk
    */
+
   function createTemplateMeta(componentTemplate) {
     const fragment = componentTemplate.dom.cloneNode(true);
+    const {
+      head,
+      tail
+    } = createHeadTailPlaceholders();
     return {
       avoidDOMInjection: true,
       fragment,
-      children: Array.from(fragment.childNodes)
+      head,
+      tail,
+      children: [head, ...Array.from(fragment.childNodes), tail]
     };
+  }
+
+  /**
+   * Get the current <template> fragment children located in between the head and tail comments
+   * @param {Comment} head - head comment node
+   * @param {Comment} tail - tail comment node
+   * @return {Array[]} children list of the nodes found in this template fragment
+   */
+
+  function getFragmentChildren(_ref) {
+    let {
+      head,
+      tail
+    } = _ref;
+    const nodes = walkNodes([head], head.nextSibling, n => n === tail, false);
+    nodes.push(tail);
+    return nodes;
+  }
+  /**
+   * Recursive function to walk all the <template> children nodes
+   * @param {Array[]} children - children nodes collection
+   * @param {ChildNode} node - current node
+   * @param {Function} check - exit function check
+   * @param {boolean} isFilterActive - filter flag to skip nodes managed by other bindings
+   * @returns {Array[]} children list of the nodes found in this template fragment
+   */
+
+  function walkNodes(children, node, check, isFilterActive) {
+    const {
+      nextSibling
+    } = node; // filter tail and head nodes together with all the nodes in between
+    // this is needed only to fix a really ugly edge case https://github.com/riot/riot/issues/2892
+
+    if (!isFilterActive && !node[HEAD_SYMBOL] && !node[TAIL_SYMBOL]) {
+      children.push(node);
+    }
+
+    if (!nextSibling || check(node)) return children;
+    return walkNodes(children, nextSibling, check, // activate the filters to skip nodes between <template> fragments that will be managed by other bindings
+    isFilterActive && !node[TAIL_SYMBOL] || nextSibling[HEAD_SYMBOL]);
   }
 
   /**
@@ -144,7 +265,7 @@ define(function () { 'use strict';
    */
 
   function isObject(value) {
-    return !isNil(value) && checkType(value, 'object');
+    return !isNil(value) && value.constructor === Object;
   }
   /**
    * Check if a value is null or undefined
@@ -179,7 +300,6 @@ define(function () { 'use strict';
   /* eslint-disable */
 
   /**
-   * @param {Node} parentNode The container where children live
    * @param {Node[]} a The list of current/live children
    * @param {Node[]} b The list of future children
    * @param {(entry: Node, action: number) => Node} get
@@ -188,7 +308,7 @@ define(function () { 'use strict';
    * @returns {Node[]} The same list of future children.
    */
 
-  var udomdiff = ((parentNode, a, b, get, before) => {
+  var udomdiff = ((a, b, get, before) => {
     const bLength = b.length;
     let aEnd = a.length;
     let bEnd = bLength;
@@ -300,7 +420,7 @@ define(function () { 'use strict';
   });
 
   const UNMOUNT_SCOPE = Symbol('unmount');
-  const EachBinding = Object.seal({
+  const EachBinding = {
     // dynamic binding properties
     // childrenMap: null,
     // node: null,
@@ -328,8 +448,7 @@ define(function () { 'use strict';
         childrenMap
       } = this;
       const collection = scope === UNMOUNT_SCOPE ? null : this.evaluate(scope);
-      const items = collection ? Array.from(collection) : [];
-      const parent = placeholder.parentNode; // prepare the diffing
+      const items = collection ? Array.from(collection) : []; // prepare the diffing
 
       const {
         newChildrenMap,
@@ -337,12 +456,14 @@ define(function () { 'use strict';
         futureNodes
       } = createPatch(items, scope, parentScope, this); // patch the DOM only if there are new nodes
 
-      udomdiff(parent, nodes, futureNodes, patch(Array.from(childrenMap.values()), parentScope), placeholder); // trigger the mounts and the updates
+      udomdiff(nodes, futureNodes, patch(Array.from(childrenMap.values()), parentScope), placeholder); // trigger the mounts and the updates
 
       batches.forEach(fn => fn()); // update the children map
 
       this.childrenMap = newChildrenMap;
-      this.nodes = futureNodes;
+      this.nodes = futureNodes; // make sure that the loop edge nodes are marked
+
+      markEdgeNodes(this.nodes);
       return this;
     },
 
@@ -351,10 +472,10 @@ define(function () { 'use strict';
       return this;
     }
 
-  });
+  };
   /**
    * Patch the DOM while diffing
-   * @param   {TemplateChunk[]} redundant - redundant tepmplate chunks
+   * @param   {any[]} redundant - list of all the children (template, nodes, context) added via each
    * @param   {*} parentScope - scope of the parent template
    * @returns {Function} patch function used by domdiff
    */
@@ -362,16 +483,25 @@ define(function () { 'use strict';
   function patch(redundant, parentScope) {
     return (item, info) => {
       if (info < 0) {
-        const element = redundant.pop();
+        // get the last element added to the childrenMap saved previously
+        const element = redundant[redundant.length - 1];
 
         if (element) {
+          // get the nodes and the template in stored in the last child of the childrenMap
           const {
             template,
+            nodes,
             context
-          } = element; // notice that we pass null as last argument because
+          } = element; // remove the last node (notice <template> tags might have more children nodes)
+
+          nodes.pop(); // notice that we pass null as last argument because
           // the root node and its children will be removed by domdiff
 
-          template.unmount(context, parentScope, null);
+          if (nodes.length === 0) {
+            // we have cleared all the children nodes and we can unmount this template
+            redundant.pop();
+            template.unmount(context, parentScope, null);
+          }
         }
       }
 
@@ -412,6 +542,19 @@ define(function () { 'use strict';
     return scope;
   }
   /**
+   * Mark the first and last nodes in order to ignore them in case we need to retrieve the <template> fragment nodes
+   * @param {Array[]} nodes - each binding nodes list
+   * @returns {undefined} void function
+   */
+
+
+  function markEdgeNodes(nodes) {
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (first) first[HEAD_SYMBOL] = true;
+    if (last) last[TAIL_SYMBOL] = true;
+  }
+  /**
    * Loop the current template items
    * @param   {Array} items - expression collection value
    * @param   {*} scope - template scope
@@ -447,15 +590,16 @@ define(function () { 'use strict';
       });
       const key = getKey ? getKey(context) : index;
       const oldItem = childrenMap.get(key);
+      const nodes = [];
 
       if (mustFilterItem(condition, context)) {
         return;
       }
 
-      const componentTemplate = oldItem ? oldItem.template : template.clone();
-      const el = oldItem ? componentTemplate.el : root.cloneNode();
       const mustMount = !oldItem;
-      const meta = isTemplateTag && mustMount ? createTemplateMeta(componentTemplate) : {};
+      const componentTemplate = oldItem ? oldItem.template : template.clone();
+      const el = componentTemplate.el || root.cloneNode();
+      const meta = isTemplateTag && mustMount ? createTemplateMeta(componentTemplate) : componentTemplate.meta;
 
       if (mustMount) {
         batches.push(() => componentTemplate.mount(el, context, parentScope, meta));
@@ -466,16 +610,17 @@ define(function () { 'use strict';
 
 
       if (isTemplateTag) {
-        const children = meta.children || componentTemplate.children;
-        futureNodes.push(...children);
+        nodes.push(...(mustMount ? meta.children : getFragmentChildren(meta)));
       } else {
-        futureNodes.push(el);
+        nodes.push(el);
       } // delete the old item from the children map
 
 
-      childrenMap.delete(key); // update the children map
+      childrenMap.delete(key);
+      futureNodes.push(...nodes); // update the children map
 
       newChildrenMap.set(key, {
+        nodes,
         template: componentTemplate,
         context,
         index
@@ -520,7 +665,7 @@ define(function () { 'use strict';
    * Binding responsible for the `if` directive
    */
 
-  const IfBinding = Object.seal({
+  const IfBinding = {
     // dynamic binding properties
     // node: null,
     // evaluate: null,
@@ -566,7 +711,7 @@ define(function () { 'use strict';
       return this;
     }
 
-  });
+  };
   function create$1(node, _ref) {
     let {
       evaluate,
@@ -844,7 +989,7 @@ define(function () { 'use strict';
     [VALUE]: valueExpression
   };
 
-  const Expression = Object.seal({
+  const Expression = {
     // Static props
     // node: null,
     // value: null,
@@ -891,7 +1036,7 @@ define(function () { 'use strict';
       return this;
     }
 
-  });
+  };
   /**
    * IO() function to handle the DOM updates
    * @param {Expression} expression - expression object
@@ -934,58 +1079,6 @@ define(function () { 'use strict';
     return Object.assign({}, flattenCollectionMethods(expressions.map(expression => create$2(node, expression)), ['mount', 'update', 'unmount']));
   }
 
-  // Riot.js constants that can be used accross more modules
-  const COMPONENTS_IMPLEMENTATION_MAP = new Map(),
-        DOM_COMPONENT_INSTANCE_PROPERTY = Symbol('riot-component'),
-        PLUGINS_SET = new Set(),
-        IS_DIRECTIVE = 'is',
-        VALUE_ATTRIBUTE = 'value',
-        MOUNT_METHOD_KEY = 'mount',
-        UPDATE_METHOD_KEY = 'update',
-        UNMOUNT_METHOD_KEY = 'unmount',
-        SHOULD_UPDATE_KEY = 'shouldUpdate',
-        ON_BEFORE_MOUNT_KEY = 'onBeforeMount',
-        ON_MOUNTED_KEY = 'onMounted',
-        ON_BEFORE_UPDATE_KEY = 'onBeforeUpdate',
-        ON_UPDATED_KEY = 'onUpdated',
-        ON_BEFORE_UNMOUNT_KEY = 'onBeforeUnmount',
-        ON_UNMOUNTED_KEY = 'onUnmounted',
-        PROPS_KEY = 'props',
-        STATE_KEY = 'state',
-        SLOTS_KEY = 'slots',
-        ROOT_KEY = 'root',
-        IS_PURE_SYMBOL = Symbol.for('pure'),
-        PARENT_KEY_SYMBOL = Symbol('parent'),
-        ATTRIBUTES_KEY_SYMBOL = Symbol('attributes'),
-        TEMPLATE_KEY_SYMBOL = Symbol('template');
-
-  var globals = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    COMPONENTS_IMPLEMENTATION_MAP: COMPONENTS_IMPLEMENTATION_MAP,
-    DOM_COMPONENT_INSTANCE_PROPERTY: DOM_COMPONENT_INSTANCE_PROPERTY,
-    PLUGINS_SET: PLUGINS_SET,
-    IS_DIRECTIVE: IS_DIRECTIVE,
-    VALUE_ATTRIBUTE: VALUE_ATTRIBUTE,
-    MOUNT_METHOD_KEY: MOUNT_METHOD_KEY,
-    UPDATE_METHOD_KEY: UPDATE_METHOD_KEY,
-    UNMOUNT_METHOD_KEY: UNMOUNT_METHOD_KEY,
-    SHOULD_UPDATE_KEY: SHOULD_UPDATE_KEY,
-    ON_BEFORE_MOUNT_KEY: ON_BEFORE_MOUNT_KEY,
-    ON_MOUNTED_KEY: ON_MOUNTED_KEY,
-    ON_BEFORE_UPDATE_KEY: ON_BEFORE_UPDATE_KEY,
-    ON_UPDATED_KEY: ON_UPDATED_KEY,
-    ON_BEFORE_UNMOUNT_KEY: ON_BEFORE_UNMOUNT_KEY,
-    ON_UNMOUNTED_KEY: ON_UNMOUNTED_KEY,
-    PROPS_KEY: PROPS_KEY,
-    STATE_KEY: STATE_KEY,
-    SLOTS_KEY: SLOTS_KEY,
-    ROOT_KEY: ROOT_KEY,
-    IS_PURE_SYMBOL: IS_PURE_SYMBOL,
-    PARENT_KEY_SYMBOL: PARENT_KEY_SYMBOL,
-    ATTRIBUTES_KEY_SYMBOL: ATTRIBUTES_KEY_SYMBOL,
-    TEMPLATE_KEY_SYMBOL: TEMPLATE_KEY_SYMBOL
-  });
-
   function extendParentScope(attributes, scope, parentScope) {
     if (!attributes || !attributes.length) return parentScope;
     const expressions = attributes.map(attr => Object.assign({}, attr, {
@@ -998,7 +1091,7 @@ define(function () { 'use strict';
 
   const getRealParent = (scope, parentScope) => scope[PARENT_KEY_SYMBOL] || parentScope;
 
-  const SlotBinding = Object.seal({
+  const SlotBinding = {
     // dynamic binding properties
     // node: null,
     // name: null,
@@ -1025,7 +1118,8 @@ define(function () { 'use strict';
 
       if (this.template) {
         this.template.mount(this.node, this.getTemplateScope(scope, realParent), realParent);
-        this.template.children = moveSlotInnerContent(this.node);
+        this.template.children = Array.from(this.node.childNodes);
+        moveSlotInnerContent(this.node);
       }
 
       removeChild(this.node);
@@ -1049,27 +1143,18 @@ define(function () { 'use strict';
       return this;
     }
 
-  });
+  };
   /**
    * Move the inner content of the slots outside of them
    * @param   {HTMLElement} slot - slot node
-   * @param   {HTMLElement} children - array to fill with the child nodes detected
-   * @returns {HTMLElement[]} list of the node moved
+   * @returns {undefined} it's a void method ¯\_(ツ)_/¯
    */
 
-  function moveSlotInnerContent(slot, children) {
-    if (children === void 0) {
-      children = [];
-    }
-
-    const child = slot.firstChild;
-
-    if (child) {
-      insertBefore(child, slot);
-      return [child, ...moveSlotInnerContent(slot)];
-    }
-
-    return children;
+  function moveSlotInnerContent(slot) {
+    const child = slot && slot.firstChild;
+    if (!child) return;
+    insertBefore(child, slot);
+    moveSlotInnerContent(slot);
   }
   /**
    * Create a single slot binding
@@ -1156,7 +1241,7 @@ define(function () { 'use strict';
     }, '');
   }
 
-  const TagBinding = Object.seal({
+  const TagBinding = {
     // dynamic binding properties
     // node: null,
     // evaluate: null,
@@ -1195,7 +1280,7 @@ define(function () { 'use strict';
       return this;
     }
 
-  });
+  };
   function create$4(node, _ref2) {
     let {
       evaluate,
@@ -1394,7 +1479,9 @@ define(function () { 'use strict';
       if (!avoidDOMInjection && this.fragment) injectDOM(el, this.fragment); // create the bindings
 
       this.bindings = this.bindingsData.map(binding => create$5(this.el, binding, templateTagOffset));
-      this.bindings.forEach(b => b.mount(scope, parentScope));
+      this.bindings.forEach(b => b.mount(scope, parentScope)); // store the template meta properties
+
+      this.meta = meta;
       return this;
     },
 
@@ -1422,9 +1509,13 @@ define(function () { 'use strict';
         this.bindings.forEach(b => b.unmount(scope, parentScope, mustRemoveRoot));
 
         switch (true) {
+          // pure components should handle the DOM unmount updates by themselves
+          case this.el[IS_PURE_SYMBOL]:
+            break;
           // <template> tags should be treated a bit differently
           // we need to clear their children only if it's explicitly required by the caller
           // via mustRemoveRoot !== null
+
           case this.children && mustRemoveRoot !== null:
             clearChildren(this.children);
             break;
@@ -1452,6 +1543,7 @@ define(function () { 'use strict';
      */
     clone() {
       return Object.assign({}, this, {
+        meta: {},
         el: null
       });
     }
@@ -1508,7 +1600,7 @@ define(function () { 'use strict';
     return domToArray(typeof selector === 'string' ? (ctx || document).querySelectorAll(selector) : selector);
   }
 
-  const COMPONENT_CORE_HELPERS = Object.freeze({
+  Object.freeze({
     // component helpers
     $(selector) {
       return $(selector, this.root)[0];
@@ -1524,7 +1616,7 @@ define(function () { 'use strict';
     [UPDATE_METHOD_KEY]: noop,
     [UNMOUNT_METHOD_KEY]: noop
   });
-  const COMPONENT_LIFECYCLE_METHODS = Object.freeze({
+  Object.freeze({
     [SHOULD_UPDATE_KEY]: noop,
     [ON_BEFORE_MOUNT_KEY]: noop,
     [ON_MOUNTED_KEY]: noop,
@@ -1533,7 +1625,7 @@ define(function () { 'use strict';
     [ON_BEFORE_UNMOUNT_KEY]: noop,
     [ON_UNMOUNTED_KEY]: noop
   });
-  const MOCKED_TEMPLATE_INTERFACE = Object.assign({}, PURE_COMPONENT_API, {
+  Object.assign({}, PURE_COMPONENT_API, {
     clone: noop,
     createDOM: noop
   });
@@ -1555,24 +1647,6 @@ define(function () { 'use strict';
     PLUGINS_SET$1.add(plugin);
     return PLUGINS_SET$1;
   }
-
-  function createCommonjsModule(fn, basedir, module) {
-  	return module = {
-  		path: basedir,
-  		exports: {},
-  		require: function (path, base) {
-  			return commonjsRequire(path, (base === undefined || base === null) ? module.path : base);
-  		}
-  	}, fn(module, module.exports), module.exports;
-  }
-
-  function commonjsRequire () {
-  	throw new Error('Dynamic requires are not currently supported by @rollup/plugin-commonjs');
-  }
-
-  var cjs = createCommonjsModule(function (module, exports) {
-
-  Object.defineProperty(exports, '__esModule', { value: true });
 
   /*! *****************************************************************************
   Copyright (c) Microsoft Corporation.
@@ -1606,6 +1680,7 @@ define(function () { 'use strict';
       return ar;
   }
 
+  /** @deprecated */
   function __spread() {
       for (var ar = [], i = 0; i < arguments.length; i++)
           ar = ar.concat(__read(arguments[i]));
@@ -1782,6 +1857,7 @@ define(function () { 'use strict';
               }
               this._frames[key] = computeFrames(frames[key]);
           }
+          this.el[SCROLL_PARENT].refresh();
           return this;
       };
       ScrollObject.prototype.render = function (frame) {
@@ -1856,11 +1932,13 @@ define(function () { 'use strict';
           var index = -1;
           if (this.children.some(function (child, i) { index = i; return child === obj || child.el === obj.el; })) {
               this.children.splice(index, 1);
+              this._lastPosition = null;
           }
       };
       ScrollParent.prototype.add = function (obj) {
           this.remove(obj);
           this.children.push(obj);
+          this._lastPosition = null;
       };
       return ScrollParent;
   }());
@@ -1875,12 +1953,20 @@ define(function () { 'use strict';
       });
   }
   var stop = false;
+  var started = false;
   function startLoop() {
       stop = false;
+      if (started) {
+          return;
+      }
+      started = true;
       requestAnimationFrame(function fn() {
           render();
           if (!stop) {
               requestAnimationFrame(fn);
+          }
+          else {
+              started = false;
           }
       });
   }
@@ -2028,10 +2114,6 @@ define(function () { 'use strict';
       }
   }
 
-  exports.add = add;
-  exports.remove = remove;
-  });
-
   install(component => {
       if (!component.hasDataScrollAnimation) {
           return component;
@@ -2040,19 +2122,19 @@ define(function () { 'use strict';
       const onMounted = component.onMounted;
       component.onMounted = (props, state) => {
           onMounted && onMounted.call(component, props, state);
-          cjs.add(component.root);
+          add(component.root);
       };
       const onUnmounted = component.onUnmounted;
       component.onUnmounted = (props, state) => {
-          cjs.remove(component.root);
+          remove(component.root);
           onUnmounted && onUnmounted.call(component, props, state);
       };
       const onUpdated = component.onUpdated;
       component.onUpdated = (props, state) => {
           onUpdated && onUpdated.call(component, props, state);
-          cjs.add(component.root);
+          add(component.root);
       };
       return component;
   });
 
-});
+})));
