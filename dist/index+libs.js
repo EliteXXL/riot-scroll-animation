@@ -3,7 +3,7 @@
   factory();
 }((function () { 'use strict';
 
-  /* Riot v5.3.0, @license MIT */
+  /* Riot v5.3.1, @license MIT */
   /**
    * Convert a string from camel case to dash-case
    * @param   {string} string - probably a component tag name
@@ -91,9 +91,9 @@
   const replaceChild = (newNode, replaced) => replaced && replaced.parentNode && replaced.parentNode.replaceChild(newNode, replaced);
 
   // Riot.js constants that can be used accross more modules
-  const COMPONENTS_IMPLEMENTATION_MAP = new Map(),
-        DOM_COMPONENT_INSTANCE_PROPERTY = Symbol('riot-component'),
-        PLUGINS_SET = new Set(),
+  const COMPONENTS_IMPLEMENTATION_MAP$1 = new Map(),
+        DOM_COMPONENT_INSTANCE_PROPERTY$1 = Symbol('riot-component'),
+        PLUGINS_SET$1 = new Set(),
         IS_DIRECTIVE = 'is',
         VALUE_ATTRIBUTE = 'value',
         MOUNT_METHOD_KEY = 'mount',
@@ -110,16 +110,17 @@
         STATE_KEY = 'state',
         SLOTS_KEY = 'slots',
         ROOT_KEY = 'root',
-        IS_PURE_SYMBOL = Symbol.for('pure'),
+        IS_PURE_SYMBOL = Symbol('pure'),
+        IS_COMPONENT_UPDATING = Symbol('is_updating'),
         PARENT_KEY_SYMBOL = Symbol('parent'),
         ATTRIBUTES_KEY_SYMBOL = Symbol('attributes'),
         TEMPLATE_KEY_SYMBOL = Symbol('template');
 
   var globals = /*#__PURE__*/Object.freeze({
     __proto__: null,
-    COMPONENTS_IMPLEMENTATION_MAP: COMPONENTS_IMPLEMENTATION_MAP,
-    DOM_COMPONENT_INSTANCE_PROPERTY: DOM_COMPONENT_INSTANCE_PROPERTY,
-    PLUGINS_SET: PLUGINS_SET,
+    COMPONENTS_IMPLEMENTATION_MAP: COMPONENTS_IMPLEMENTATION_MAP$1,
+    DOM_COMPONENT_INSTANCE_PROPERTY: DOM_COMPONENT_INSTANCE_PROPERTY$1,
+    PLUGINS_SET: PLUGINS_SET$1,
     IS_DIRECTIVE: IS_DIRECTIVE,
     VALUE_ATTRIBUTE: VALUE_ATTRIBUTE,
     MOUNT_METHOD_KEY: MOUNT_METHOD_KEY,
@@ -137,6 +138,7 @@
     SLOTS_KEY: SLOTS_KEY,
     ROOT_KEY: ROOT_KEY,
     IS_PURE_SYMBOL: IS_PURE_SYMBOL,
+    IS_COMPONENT_UPDATING: IS_COMPONENT_UPDATING,
     PARENT_KEY_SYMBOL: PARENT_KEY_SYMBOL,
     ATTRIBUTES_KEY_SYMBOL: ATTRIBUTES_KEY_SYMBOL,
     TEMPLATE_KEY_SYMBOL: TEMPLATE_KEY_SYMBOL
@@ -667,7 +669,7 @@
     };
   }
 
-  function create(node, _ref2) {
+  function create$6(node, _ref2) {
     let {
       evaluate,
       condition,
@@ -746,7 +748,7 @@
     }
 
   };
-  function create$1(node, _ref) {
+  function create$5(node, _ref) {
     let {
       evaluate,
       template
@@ -1082,7 +1084,7 @@
     return expressions[expression.type](expression.node, expression, value, expression.value);
   }
 
-  function create$2(node, data) {
+  function create$4(node, data) {
     return Object.assign({}, Expression, data, {
       node: data.type === TEXT ? getTextNode(node, data.childNodeIndex) : node
     });
@@ -1110,7 +1112,7 @@
     let {
       expressions
     } = _ref;
-    return Object.assign({}, flattenCollectionMethods(expressions.map(expression => create$2(node, expression)), ['mount', 'update', 'unmount']));
+    return Object.assign({}, flattenCollectionMethods(expressions.map(expression => create$4(node, expression)), ['mount', 'update', 'unmount']));
   }
 
   function extendParentScope(attributes, scope, parentScope) {
@@ -1148,7 +1150,7 @@
         parentNode
       } = this.node;
       const realParent = getRealParent(scope, parentScope);
-      this.template = templateData && create$6(templateData.html, templateData.bindings).createDOM(parentNode);
+      this.template = templateData && create(templateData.html, templateData.bindings).createDOM(parentNode);
 
       if (this.template) {
         this.template.mount(this.node, this.getTemplateScope(scope, realParent), realParent);
@@ -1237,7 +1239,7 @@
     } // otherwise we return a template chunk
 
 
-    return create$6(slotsToMarkup(slots), [...slotBindings(slots), {
+    return create(slotsToMarkup(slots), [...slotBindings(slots), {
       // the attributes should be registered as binding
       // if we fallback to a normal template chunk
       expressions: attributes.map(attr => {
@@ -1315,7 +1317,7 @@
     }
 
   };
-  function create$4(node, _ref2) {
+  function create$2(node, _ref2) {
     let {
       evaluate,
       getComponent,
@@ -1332,10 +1334,10 @@
   }
 
   var bindings = {
-    [IF]: create$1,
+    [IF]: create$5,
     [SIMPLE]: create$3,
-    [EACH]: create,
-    [TAG]: create$4,
+    [EACH]: create$6,
+    [TAG]: create$2,
     [SLOT]: createSlot
   };
 
@@ -1361,7 +1363,7 @@
    */
 
 
-  function create$5(root, binding, templateTagOffset) {
+  function create$1(root, binding, templateTagOffset) {
     const {
       selector,
       type,
@@ -1512,7 +1514,7 @@
 
       if (!avoidDOMInjection && this.fragment) injectDOM(el, this.fragment); // create the bindings
 
-      this.bindings = this.bindingsData.map(binding => create$5(this.el, binding, templateTagOffset));
+      this.bindings = this.bindingsData.map(binding => create$1(this.el, binding, templateTagOffset));
       this.bindings.forEach(b => b.mount(scope, parentScope)); // store the template meta properties
 
       this.meta = meta;
@@ -1590,7 +1592,7 @@
    * @returns {TemplateChunk} a new TemplateChunk copy
    */
 
-  function create$6(html, bindings) {
+  function create(html, bindings) {
     if (bindings === void 0) {
       bindings = [];
     }
@@ -1952,7 +1954,7 @@
    */
 
 
-  const bindDOMNodeToComponentObject = (node, component) => node[DOM_COMPONENT_INSTANCE_PROPERTY] = component;
+  const bindDOMNodeToComponentObject = (node, component) => node[DOM_COMPONENT_INSTANCE_PROPERTY$1] = component;
   /**
    * Wrap the Riot.js core API methods using a mapping function
    * @param   {Function} mapFunction - lifting function
@@ -1976,11 +1978,11 @@
 
   function componentTemplateFactory(template, componentShell) {
     const components = createSubcomponents(componentShell.exports ? componentShell.exports.components : {});
-    return template(create$6, expressionTypes, bindingTypes, name => {
+    return template(create, expressionTypes, bindingTypes, name => {
       // improve support for recursive components
       if (name === componentShell.name) return memoizedCreateComponent(componentShell); // return the registered components
 
-      return components[name] || COMPONENTS_IMPLEMENTATION_MAP.get(name);
+      return components[name] || COMPONENTS_IMPLEMENTATION_MAP$1.get(name);
     });
   }
   /**
@@ -2133,7 +2135,7 @@
       attributes = [];
     }
 
-    const expressions = attributes.map(a => create$2(node, a));
+    const expressions = attributes.map(a => create$4(node, a));
     const binding = {};
     return Object.assign(binding, Object.assign({
       expressions
@@ -2168,7 +2170,7 @@
 
 
   function runPlugins(component) {
-    return [...PLUGINS_SET].reduce((c, fn) => fn(c) || c, component);
+    return [...PLUGINS_SET$1].reduce((c, fn) => fn(c) || c, component);
   }
   /**
    * Compute the component current state merging it with its previous state
@@ -2250,9 +2252,16 @@
         if (this[SHOULD_UPDATE_KEY](newProps, this[PROPS_KEY]) === false) return;
         defineProperty(this, PROPS_KEY, Object.freeze(Object.assign({}, this[PROPS_KEY], newProps)));
         this[STATE_KEY] = computeState(this[STATE_KEY], state);
-        this[ON_BEFORE_UPDATE_KEY](this[PROPS_KEY], this[STATE_KEY]);
-        this[TEMPLATE_KEY_SYMBOL].update(this, this[PARENT_KEY_SYMBOL]);
+        this[ON_BEFORE_UPDATE_KEY](this[PROPS_KEY], this[STATE_KEY]); // avoiding recursive updates
+        // see also https://github.com/riot/riot/issues/2895
+
+        if (!this[IS_COMPONENT_UPDATING]) {
+          this[IS_COMPONENT_UPDATING] = true;
+          this[TEMPLATE_KEY_SYMBOL].update(this, this[PARENT_KEY_SYMBOL]);
+        }
+
         this[ON_UPDATED_KEY](this[PROPS_KEY], this[STATE_KEY]);
+        this[IS_COMPONENT_UPDATING] = false;
         return this;
       },
 
@@ -2270,9 +2279,9 @@
   }
 
   const {
-    DOM_COMPONENT_INSTANCE_PROPERTY: DOM_COMPONENT_INSTANCE_PROPERTY$1,
-    COMPONENTS_IMPLEMENTATION_MAP: COMPONENTS_IMPLEMENTATION_MAP$1,
-    PLUGINS_SET: PLUGINS_SET$1
+    DOM_COMPONENT_INSTANCE_PROPERTY,
+    COMPONENTS_IMPLEMENTATION_MAP,
+    PLUGINS_SET
   } = globals;
   /**
    * Define a riot plugin
@@ -2282,9 +2291,9 @@
 
   function install(plugin) {
     if (!isFunction(plugin)) panic('Plugins must be of type function');
-    if (PLUGINS_SET$1.has(plugin)) panic('This plugin was already installed');
-    PLUGINS_SET$1.add(plugin);
-    return PLUGINS_SET$1;
+    if (PLUGINS_SET.has(plugin)) panic('This plugin was already installed');
+    PLUGINS_SET.add(plugin);
+    return PLUGINS_SET;
   }
 
   /*! *****************************************************************************
@@ -2319,11 +2328,10 @@
       return ar;
   }
 
-  /** @deprecated */
-  function __spread() {
-      for (var ar = [], i = 0; i < arguments.length; i++)
-          ar = ar.concat(__read(arguments[i]));
-      return ar;
+  function __spreadArray(to, from) {
+      for (var i = 0, il = from.length, j = to.length; i < il; i++, j++)
+          to[j] = from[i];
+      return to;
   }
 
   function computeFrames(frames) {
@@ -2441,12 +2449,24 @@
               return "";
           };
       }
-      function constructString(values) {
-          var staticStringArray = staticString.split("");
-          for (var i = indexes.length - 1; i >= 0; i--) {
-              staticStringArray.splice(indexes[i], 0, values[i].toString());
+      var staticStringArray = staticString.split("").reduce(function (prev, current, index) {
+          if (indexes.some(function (i) { return i === index; })) {
+              prev.push("");
           }
-          return staticStringArray.join("");
+          prev[prev.length - 1] += current;
+          return prev;
+      }, [""]);
+      function constructString(values) {
+          var constructedString = "";
+          var index = 0;
+          indexes.forEach(function (_, i) {
+              constructedString += staticStringArray[index] + values[i].toString();
+              index++;
+          });
+          if (index < staticStringArray.length) {
+              constructedString += staticStringArray[index];
+          }
+          return constructedString;
       }
       return function (frameNumber) {
           if (frameNumber === "before") {
@@ -2518,9 +2538,9 @@
               }
               var match = lastKey.match(/(.*)\(\)$/);
               if (match) {
-                  lastObject[match[1]].apply(lastObject, __spread([
+                  lastObject[match[1]].apply(lastObject, __spreadArray([
                       frame
-                  ], this_1._frames[key](frame).split(",").map(function (t) { return t.trim(); }).filter(function (t) { return t !== ""; })));
+                  ], __read(this_1._frames[key](frame).split(",").map(function (t) { return t.trim(); }).filter(function (t) { return t !== ""; }))));
               }
               else {
                   lastObject[lastKey] = this_1._frames[key](frame);
@@ -2542,6 +2562,7 @@
           this.bottomOffset = 0;
           this._lastPosition = null;
           el[SCROLL_PARENT] = this;
+          this._computedStyle = window.getComputedStyle(this.el);
       }
       ScrollParent.prototype.refresh = function () {
           this._lastPosition = null;
@@ -2553,10 +2574,25 @@
           if (this.children.length === 0) {
               return;
           }
-          var rect = this.el.getBoundingClientRect();
+          var rectTop = (function () {
+              var top = 0;
+              var el = _this.el;
+              while (true) {
+                  top += el.offsetTop;
+                  el = el.offsetParent;
+                  if (el != null) {
+                      top -= el.scrollTop;
+                  }
+                  else {
+                      break;
+                  }
+              }
+              return top - window.pageYOffset;
+          })();
+          var rectBottom = rectTop + this.el.offsetHeight;
           var trigger = document.documentElement.clientHeight * this.trigger;
-          var top = rect.top - this.topOffset;
-          var bottom = rect.bottom + this.bottomOffset;
+          var top = rectTop - this.topOffset;
+          var bottom = rectBottom + this.bottomOffset;
           var position = (trigger - top) / (bottom - top);
           var actualPosition = position > 1 ? "after" : position < 0 ? "before" : position;
           if (actualPosition !== this._lastPosition || force) {
@@ -2564,7 +2600,6 @@
               this.children.forEach(function (child) {
                   child.render(_this._lastPosition);
               });
-              this.el.dispatchEvent(new CustomEvent("render", { detail: { position: this._lastPosition }, bubbles: false }));
           }
       };
       ScrollParent.prototype.remove = function (obj) {
