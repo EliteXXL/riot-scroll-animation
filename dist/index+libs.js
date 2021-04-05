@@ -3,7 +3,7 @@
   factory();
 }((function () { 'use strict';
 
-  /* Riot v5.3.1, @license MIT */
+  /* Riot v5.3.2, @license MIT */
   /**
    * Convert a string from camel case to dash-case
    * @param   {string} string - probably a component tag name
@@ -822,8 +822,6 @@
     }, {});
   }
 
-  const REMOVE_ATTRIBUTE = 'removeAttribute';
-  const SET_ATTIBUTE = 'setAttribute';
   const ElementProto = typeof Element === 'undefined' ? {} : Element.prototype;
   const isNativeHtmlProperty = memoize(name => ElementProto.hasOwnProperty(name)); // eslint-disable-line
 
@@ -854,6 +852,26 @@
   function removeAllAttributes(node, newAttributes, oldAttributes) {
     const newKeys = newAttributes ? Object.keys(newAttributes) : [];
     Object.keys(oldAttributes).filter(name => !newKeys.includes(name)).forEach(attribute => node.removeAttribute(attribute));
+  }
+  /**
+   * Check whether the attribute value can be rendered
+   * @param {*} value - expression value
+   * @returns {boolean} true if we can render this attribute value
+   */
+
+
+  function canRenderAttribute(value) {
+    return value === true || typeof value === 'string';
+  }
+  /**
+   * Check whether the attribute should be removed
+   * @param {*} value - expression value
+   * @returns {boolean} boolean - true if the attribute can be removed}
+   */
+
+
+  function shouldRemoveAttribute(value) {
+    return isNil(value) || value === false || value === '';
   }
   /**
    * This methods handles the DOM attributes updates
@@ -891,16 +909,11 @@
       node[name] = value;
     }
 
-    node[getMethod(value)](name, normalizeValue(name, value));
-  }
-  /**
-   * Get the attribute modifier method
-   * @param   {*} value - if truthy we return `setAttribute` othewise `removeAttribute`
-   * @returns {string} the node attribute modifier method name
-   */
-
-  function getMethod(value) {
-    return isNil(value) || value === false || value === '' || isObject(value) || isFunction(value) ? REMOVE_ATTRIBUTE : SET_ATTIBUTE;
+    if (shouldRemoveAttribute(value)) {
+      node.removeAttribute(name);
+    } else if (canRenderAttribute(value)) {
+      node.setAttribute(name, normalizeValue(name, value));
+    }
   }
   /**
    * Get the value as string
@@ -908,7 +921,6 @@
    * @param   {*} value - user input value
    * @returns {string} input value as string
    */
-
 
   function normalizeValue(name, value) {
     // be sure that expressions like selected={ true } will be always rendered as selected='selected'
@@ -1293,7 +1305,7 @@
     update(scope, parentScope) {
       const name = this.evaluate(scope); // simple update
 
-      if (name === this.name) {
+      if (name && name === this.name) {
         this.tag.update(scope);
       } else {
         // unmount the old tag if it exists
@@ -2334,6 +2346,7 @@
       return to;
   }
 
+  var EXTRAPOLATE = Symbol("extrapolate");
   function computeFrames(frames) {
       var staticString = null;
       var indexes = [];
@@ -2341,6 +2354,7 @@
       var frameValues = [];
       var beforeValue = null;
       var afterValue = null;
+      var needUpdateAt = [false, null, null, false];
       function getNearestLeftIndexOf(frameNumber) {
           if (frameNumbers.length === 0) {
               return -1;
@@ -2376,16 +2390,30 @@
               return result;
           });
           frames.forEach(function (frame) {
-              if (frame[0] === "after") {
+              if (frame[1] === EXTRAPOLATE) {
+                  if (frame[0] !== "after" && frame[0] !== "before") {
+                      frameNumbers.push(frame[0]);
+                  }
+                  return;
+              }
+              else if (frame[0] === "after") {
                   afterValue = frame[1];
+                  needUpdateAt[3] = true;
                   return;
               }
               else if (frame[0] === "before") {
                   beforeValue = frame[1];
+                  needUpdateAt[0] = true;
                   return;
               }
               var thisStaticString;
               frameNumbers.push(frame[0]);
+              if (needUpdateAt[1] == null || needUpdateAt[1] > frame[0]) {
+                  needUpdateAt[1] = frame[0];
+              }
+              if (needUpdateAt[2] == null || needUpdateAt[2] < frame[0]) {
+                  needUpdateAt[2] = frame[0];
+              }
               if (!constants_1) {
                   thisStaticString = frame[1].trim()
                       .replace(/[ ]*,[ ]*/g, ",")
@@ -2417,36 +2445,42 @@
               }
           });
           if (constants_1) {
-              return function (frameNumber) {
-                  if (frameNumber === "before") {
-                      if (beforeValue != null) {
-                          return beforeValue;
+              return {
+                  compute: function (frameNumber) {
+                      if (frameNumber === "before") {
+                          if (beforeValue != null) {
+                              return beforeValue;
+                          }
+                          return frames[0][1];
                       }
-                      return frames[0][1];
-                  }
-                  else if (frameNumber === "after") {
-                      if (afterValue != null) {
-                          return afterValue;
+                      else if (frameNumber === "after") {
+                          if (afterValue != null) {
+                              return afterValue;
+                          }
+                          return frames[frames.length - 1][1];
                       }
-                      return frames[frames.length - 1][1];
-                  }
-                  var index = getNearestLeftIndexOf(frameNumber);
-                  if (index === -1) {
-                      return "";
-                  }
-                  return frames[index][1];
+                      var index = getNearestLeftIndexOf(frameNumber);
+                      if (index === -1) {
+                          return "";
+                      }
+                      return frames[index][1];
+                  },
+                  needUpdateAt: needUpdateAt
               };
           }
       }
       if (frameValues.length === 0) {
-          return function (frameNumber) {
-              if (frameNumber === "before" && beforeValue != null) {
-                  return beforeValue;
-              }
-              else if (frameNumber === "after" && afterValue != null) {
-                  return afterValue;
-              }
-              return "";
+          return {
+              compute: function (frameNumber) {
+                  if (frameNumber === "before" && beforeValue != null) {
+                      return beforeValue;
+                  }
+                  else if (frameNumber === "after" && afterValue != null) {
+                      return afterValue;
+                  }
+                  return "";
+              },
+              needUpdateAt: [needUpdateAt[0], null, null, needUpdateAt[3]]
           };
       }
       var staticStringArray = staticString.split("").reduce(function (prev, current, index) {
@@ -2468,36 +2502,39 @@
           }
           return constructedString;
       }
-      return function (frameNumber) {
-          if (frameNumber === "before") {
-              if (beforeValue != null) {
-                  return beforeValue;
+      return {
+          compute: function (frameNumber) {
+              if (frameNumber === "before") {
+                  if (beforeValue != null) {
+                      return beforeValue;
+                  }
+                  return constructString(frameValues[0]);
               }
-              return constructString(frameValues[0]);
-          }
-          else if (frameNumber === "after") {
-              if (afterValue != null) {
-                  return afterValue;
+              else if (frameNumber === "after") {
+                  if (afterValue != null) {
+                      return afterValue;
+                  }
+                  return constructString(frameValues[frameValues.length - 1]);
               }
-              return constructString(frameValues[frameValues.length - 1]);
-          }
-          frameNumber = Math.min(Math.max(0, frameNumber), 1);
-          var index = getNearestLeftIndexOf(frameNumber);
-          if (index === -1) {
-              return "";
-          }
-          if (index === frameNumbers.length - 1) {
-              return constructString(frameValues[index]);
-          }
-          var left = frameNumbers[index];
-          var right = frameNumbers[index + 1];
-          var perc = (frameNumber - left) / (right - left);
-          var computedValues = [];
-          frameValues[index].forEach(function (value, v_index) {
-              var nextValue = frameValues[index + 1][v_index];
-              computedValues.push(value + ((nextValue - value) * perc));
-          });
-          return constructString(computedValues);
+              frameNumber = Math.min(Math.max(0, frameNumber), 1);
+              var index = getNearestLeftIndexOf(frameNumber);
+              if (index === -1) {
+                  return "";
+              }
+              if (index === frameNumbers.length - 1) {
+                  return constructString(frameValues[index]);
+              }
+              var left = frameNumbers[index];
+              var right = frameNumbers[index + 1];
+              var perc = (frameNumber - left) / (right - left);
+              var computedValues = [];
+              frameValues[index].forEach(function (value, v_index) {
+                  var nextValue = frameValues[index + 1][v_index];
+                  computedValues.push(value + ((nextValue - value) * perc));
+              });
+              return constructString(computedValues);
+          },
+          needUpdateAt: needUpdateAt
       };
   }
   var SCROLL_OBJECT = Symbol("scroll-object");
@@ -2505,7 +2542,9 @@
   var ScrollObject = (function () {
       function ScrollObject(el, frames) {
           this.el = el;
+          this._needUpdateAt = [false, null, null, false];
           this._frames = {};
+          this._lastRenderFrame = null;
           this.refresh(frames);
       }
       ScrollObject.prototype.refresh = function (frames) {
@@ -2514,12 +2553,41 @@
               if (!Object.prototype.hasOwnProperty.call(frames, key)) {
                   continue;
               }
-              this._frames[key] = computeFrames(frames[key]);
+              var _a = computeFrames(frames[key]), compute = _a.compute, needUpdateAt = _a.needUpdateAt;
+              this._frames[key] = compute;
+              this._needUpdateAt[0] = this._needUpdateAt[0] || needUpdateAt[0];
+              if (this._needUpdateAt[1] !== needUpdateAt[1] &&
+                  needUpdateAt[1] != null && (this._needUpdateAt[1] == null ||
+                  needUpdateAt[1] < this._needUpdateAt[1])) {
+                  this._needUpdateAt[1] = needUpdateAt[1];
+              }
+              if (this._needUpdateAt[2] !== needUpdateAt[2] &&
+                  needUpdateAt[2] != null && (this._needUpdateAt[2] == null ||
+                  needUpdateAt[2] > this._needUpdateAt[2])) {
+                  this._needUpdateAt[2] = needUpdateAt[2];
+              }
+              this._needUpdateAt[3] = this._needUpdateAt[3] || needUpdateAt[3];
           }
           this.el[SCROLL_PARENT].refresh();
           return this;
       };
-      ScrollObject.prototype.render = function (frame) {
+      ScrollObject.prototype.render = function (frame, force) {
+          if (force === void 0) { force = false; }
+          if (!force &&
+              this._lastRenderFrame === frame) {
+              return;
+          }
+          if (this._lastRenderFrame != null &&
+              frame !== "before" && frame !== "after" &&
+              this._lastRenderFrame !== "before" &&
+              this._lastRenderFrame !== "after" &&
+              ((this._needUpdateAt[1] == null || frame < this._needUpdateAt[1]) ||
+                  (this._needUpdateAt[2] == null || frame > this._needUpdateAt[2])) &&
+              ((this._needUpdateAt[1] == null || this._lastRenderFrame < this._needUpdateAt[1]) ||
+                  (this._needUpdateAt[2] == null || this._lastRenderFrame > this._needUpdateAt[2]))) {
+              return;
+          }
+          this._lastRenderFrame = frame;
           var _loop_1 = function (key) {
               if (!Object.prototype.hasOwnProperty.call(this_1._frames, key)) {
                   return "continue";
@@ -2598,7 +2666,7 @@
           if (actualPosition !== this._lastPosition || force) {
               this._lastPosition = actualPosition;
               this.children.forEach(function (child) {
-                  child.render(_this._lastPosition);
+                  child.render(_this._lastPosition, force);
               });
           }
       };
@@ -2725,6 +2793,11 @@
                   else if (dataSplit[1] === "after") {
                       scrollOptions[propertyName] = (scrollOptions[propertyName] || []).concat([["after", attr.value]]);
                   }
+                  else if (dataSplit[1] === "extrapolate") {
+                      scrollOptions[propertyName] = (scrollOptions[propertyName] || []).concat([
+                          [0, EXTRAPOLATE], [1, EXTRAPOLATE]
+                      ]);
+                  }
               }
           }
       });
@@ -2780,7 +2853,7 @@
           if (scrollObject != null) {
               scrollParent.remove(scrollObject);
               if (renderFrame != null) {
-                  scrollObject.render(renderFrame);
+                  scrollObject.render(renderFrame, true);
               }
           }
           delete element[SCROLL_PARENT];
