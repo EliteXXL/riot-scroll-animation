@@ -1,6 +1,6 @@
 {
   "name": "riot-scroll-animation",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "RIOT plugin for data-scroll-animation",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
@@ -11,12 +11,12 @@
   "author": "Giuliano Collacchioni",
   "license": "MIT",
   "dependencies": {
-    "data-scroll-animation": "^1.2.0",
-    "riot": "^5.3.3"
+    "data-scroll-animation": "^1.2.1",
+    "riot": "^5.4.1"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-node-resolve": "^11.2.1",
-    "rollup": "^2.44.0"
+    "rollup": "^2.47.0"
   }
 }

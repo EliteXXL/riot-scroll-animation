@@ -3,7 +3,7 @@
   factory();
 }((function () { 'use strict';
 
-  /* Riot v5.3.3, @license MIT */
+  /* Riot v5.4.1, @license MIT */
   /**
    * Convert a string from camel case to dash-case
    * @param   {string} string - probably a component tag name
@@ -833,7 +833,7 @@
    */
 
   function setAllAttributes(node, attributes) {
-    Object.entries(attributes).forEach((_ref) => {
+    Object.entries(attributes).forEach(_ref => {
       let [name, value] = _ref;
       return attributeExpression(node, {
         name
@@ -1152,7 +1152,7 @@
 
     // API methods
     mount(scope, parentScope) {
-      const templateData = scope.slots ? scope.slots.find((_ref) => {
+      const templateData = scope.slots ? scope.slots.find(_ref => {
         let {
           id
         } = _ref;
@@ -1674,7 +1674,7 @@
    */
 
   function defineProperties(source, properties, options) {
-    Object.entries(properties).forEach((_ref) => {
+    Object.entries(properties).forEach(_ref => {
       let [key, value] = _ref;
       defineProperty(source, key, value, options);
     });
@@ -1688,7 +1688,7 @@
    */
 
   function defineDefaults(source, defaults) {
-    Object.entries(defaults).forEach((_ref2) => {
+    Object.entries(defaults).forEach(_ref2 => {
       let [key, value] = _ref2;
       if (!source[key]) source[key] = value;
     });
@@ -2061,7 +2061,7 @@
       name
     } = componentShell;
     const templateFn = template ? componentTemplateFactory(template, componentShell) : MOCKED_TEMPLATE_INTERFACE;
-    return (_ref2) => {
+    return _ref2 => {
       let {
         slots,
         attributes,
@@ -2124,6 +2124,7 @@
     if (css && name) cssManager.add(name, css);
     return curry(enhanceComponentAPI)(defineProperties( // set the component defaults without overriding the original component API
     defineDefaults(componentAPI, Object.assign({}, COMPONENT_LIFECYCLE_METHODS, {
+      [PROPS_KEY]: {},
       [STATE_KEY]: {}
     })), Object.assign({
       // defined during the component creation
@@ -2566,6 +2567,17 @@
                   return "continue";
               }
               var _b = computeFrames(frames[key]), compute = _b.compute, needUpdateAt = _b.needUpdateAt;
+              if (isFunction && needUpdateAt.every(function (value, index) {
+                  if (index === 0 || index === 3) {
+                      return value === false;
+                  }
+                  return value === null;
+              })) {
+                  needUpdateAt[0] = true;
+                  needUpdateAt[1] = 0;
+                  needUpdateAt[2] = 1;
+                  needUpdateAt[3] = true;
+              }
               var keyLength = splitKey.length;
               var accessor = function () {
                   var lastObject = _this.el;
@@ -2626,9 +2638,9 @@
               }
               var key = accessorResult[1];
               if (isFunction) {
-                  object.apply(object, __spreadArray([
-                      frame
-                  ], __read(compute(frame).split(",").map(function (t) { return t.trim(); }).filter(function (t) { return t !== ""; }))));
+                  renders.push([object, key, __spreadArray([
+                          frame
+                      ], __read(compute(frame).split(",").map(function (t) { return t.trim(); }).filter(function (t) { return t !== ""; })))]);
               }
               else {
                   renders.push([object, key, compute(frame)]);
@@ -2638,6 +2650,16 @@
       };
       return ScrollObject;
   }());
+  function getFirstScrollParent(element) {
+      if (element == null) {
+          return null;
+      }
+      if (element.scrollHeight !== element.clientHeight ||
+          element.scrollWidth !== element.scrollWidth) {
+          return element;
+      }
+      return getFirstScrollParent(element.parentElement);
+  }
   var ScrollParent = (function () {
       function ScrollParent(el) {
           this.el = el;
@@ -2655,11 +2677,14 @@
           this._parents = [];
           var el = this.el;
           while (true) {
-              el = el.offsetParent;
+              el = getFirstScrollParent(el);
               if (el == null) {
                   break;
               }
-              this._parents.push(el);
+              if (el !== this.el) {
+                  this._parents.push(el);
+              }
+              el = el.parentElement;
           }
           return this;
       };
@@ -2673,7 +2698,7 @@
       };
       ScrollParent.prototype.render = function (renders, force) {
           if (force === void 0) { force = false; }
-          if (this.children.length === 0) {
+          if (this.children.length === 0 || (this.el.clientHeight === 0 && this.el.clientWidth === 0)) {
               return renders;
           }
           var rectTop = this._getRectTop();
@@ -2683,11 +2708,12 @@
           var bottom = rectBottom + this.bottomOffset;
           var position = (trigger - top) / (bottom - top);
           var actualPosition = position > 1 ? "after" : position < 0 ? "before" : position;
-          if (actualPosition !== this._lastPosition || force) {
-              this._lastPosition = actualPosition;
-              for (var i = this.children.length - 1; i >= 0; i--) {
-                  this.children[i].render(this._lastPosition, renders, force);
-              }
+          if (actualPosition === this._lastPosition && !force) {
+              return renders;
+          }
+          this._lastPosition = actualPosition;
+          for (var i = this.children.length - 1; i >= 0; i--) {
+              this.children[i].render(this._lastPosition, renders, force);
           }
           return renders;
       };
@@ -2717,7 +2743,14 @@
       }
       for (var i = renders.length - 1; i >= 0; i--) {
           var render_1 = renders[i];
-          render_1[0][render_1[1]] = render_1[2];
+          var result = render_1[2];
+          var object = render_1[0];
+          if (Array.isArray(result)) {
+              object[render_1[1]].apply(object, result);
+          }
+          else {
+              object[render_1[1]] = result;
+          }
       }
   }
   var stop = false;
@@ -2733,13 +2766,19 @@
               render();
               requestAnimationFrame(fn);
           }
-          else {
-              started = false;
-          }
       });
   }
   function endLoop() {
       stop = true;
+      started = false;
+  }
+  function getRefreshedParent(element) {
+      if (element[SCROLL_PARENT]) {
+          return element[SCROLL_PARENT].refresh();
+      }
+      var parent = new ScrollParent(element);
+      scrollParents.push(parent);
+      return parent;
   }
   function parse(element, parent, subtree) {
       if (subtree === void 0) { subtree = true; }
@@ -2750,46 +2789,26 @@
           }
           var data = attr.name.substr(11);
           if (data === "-parent") {
-              if (element[SCROLL_PARENT]) {
-                  parent = element[SCROLL_PARENT].refresh();
-              }
-              else {
-                  scrollParents.push(parent = new ScrollParent(element));
-              }
+              parent = getRefreshedParent(element);
           }
           else if (data === "-trigger") {
               var trigger = parseFloat(attr.value);
               if (!isNaN(trigger)) {
-                  if (element[SCROLL_PARENT]) {
-                      parent = element[SCROLL_PARENT].refresh();
-                  }
-                  else {
-                      scrollParents.push(parent = new ScrollParent(element));
-                  }
+                  parent = getRefreshedParent(element);
                   parent.trigger = trigger;
               }
           }
           else if (data === "-bottom") {
               var bottom = parseFloat(attr.value);
               if (!isNaN(bottom)) {
-                  if (element[SCROLL_PARENT]) {
-                      parent = element[SCROLL_PARENT].refresh();
-                  }
-                  else {
-                      scrollParents.push(parent = new ScrollParent(element));
-                  }
+                  parent = getRefreshedParent(element);
                   parent.bottomOffset = bottom;
               }
           }
           else if (data === "-top") {
               var top_1 = parseFloat(attr.value);
               if (!isNaN(top_1)) {
-                  if (element[SCROLL_PARENT]) {
-                      parent = element[SCROLL_PARENT].refresh();
-                  }
-                  else {
-                      scrollParents.push(parent = new ScrollParent(element));
-                  }
+                  parent = getRefreshedParent(element);
                   parent.topOffset = top_1;
               }
           }
