@@ -1,8 +1,12 @@
 const commonjs = require("@rollup/plugin-commonjs");
 const nodeResolve = require("@rollup/plugin-node-resolve").default;
 
+const baseGlobals = {
+    "riot": "riot"
+};
+const baseExternal = Object.keys(baseGlobals);
 const globals = {
-    "riot": "riot",
+    ...baseGlobals,
     "data-scroll-animation": "dataScrollAnimation"
 };
 const external = Object.keys(globals);
@@ -30,6 +34,7 @@ export default [
     },
     {
         input: "src/index.js",
+        external: baseExternal,
         plugins: [
             nodeResolve(),
             commonjs()
@@ -38,7 +43,8 @@ export default [
             {
                 name: "riotScrollAnimation",
                 file: "dist/index+libs.js",
-                format: "umd"
+                format: "umd",
+                globals: baseGlobals
             }
         ]
     }
