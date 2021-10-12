@@ -2,7 +2,7 @@
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(require('riot'), require('data-scroll-animation')) :
     typeof define === 'function' && define.amd ? define(['riot', 'data-scroll-animation'], factory) :
     (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.riot, global.dataScrollAnimation));
-}(this, (function (riot, ScrollAnimation) { 'use strict';
+})(this, (function (riot, ScrollAnimation) { 'use strict';
 
     function _interopNamespace(e) {
         if (e && e.__esModule) return e;
@@ -13,14 +13,12 @@
                     var d = Object.getOwnPropertyDescriptor(e, k);
                     Object.defineProperty(n, k, d.get ? d : {
                         enumerable: true,
-                        get: function () {
-                            return e[k];
-                        }
+                        get: function () { return e[k]; }
                     });
                 }
             });
         }
-        n['default'] = e;
+        n["default"] = e;
         return Object.freeze(n);
     }
 
@@ -49,4 +47,4 @@
         return component;
     });
 
-})));
+}));
